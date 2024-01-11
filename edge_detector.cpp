@@ -9,7 +9,7 @@ CannyEdgeDetector::CannyEdgeDetector(const std::string &imagePath, int lowThresh
 
 cv::Mat CannyEdgeDetector::loadImage(const std::string &imagePath)
 {
-
+    std::cout<<imagePath<<"\n";
     std::cout << "about to read image \n";
     cv::Mat image = cv::imread(imagePath, cv::IMREAD_GRAYSCALE);
 
