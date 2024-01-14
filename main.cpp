@@ -8,7 +8,7 @@ int main()
   int size = 5;
   double sigma = 1.0;
 
-  CannyEdgeDetector edge{"../images/cat.jpg", 12, 12};
+  CannyEdgeDetector edge{"../images/person.jpg", 12, 12};
   // CannyEdgeDetector edgeDetector("./images/cat.jpg", 10, 20);
 
   // edgeDetector.applyGaussianBlur();

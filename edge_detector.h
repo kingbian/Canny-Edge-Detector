@@ -12,12 +12,12 @@ public:
 
     cv::Mat loadImage(const std::string &imagePath);
     void applyGaussianBlur();
-    void findGradient();
+    void findGradient(cv::Mat &dstImage);
     void displayImage();
     void applyNonMaxSuppression();
     std::vector<std::vector<double>> createGaussianFilter(int size, double sigma);
 
 private:
-    cv::Mat srcImage;
+    cv::Mat srcImage, dstImage;
     int lowThreshold, upperThreshold;
 };
