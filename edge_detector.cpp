@@ -82,12 +82,12 @@ void CannyEdgeDetector::displayImage(const cv::Mat &image)
 
   cv::imshow("Display window", image);
 
-  int input = cv::waitKey(0); // wait for input
-
-  if (input == 's')
-  {
-    std::cout << "writing image\n";
-  }
+  // int input = cv::waitKey(0); // wait for input
+  cv::imwrite("../images/test.jpg", image);
+  // if (input == 's')
+  // {
+  //   std::cout << "writing image\n";
+  // }
 }
 
 void CannyEdgeDetector::applyGaussianBlur()
@@ -164,23 +164,8 @@ void CannyEdgeDetector::findGradient(cv::Mat &dstImage)
   std::vector<std::vector<float>> magnitudes(rows, std::vector<float>(cols, 0));
 
   float maxMagnitude = 0.0;
-  for (int i = 1; i < rows - 1; ++i)
-  {
-    for (int j = 1; j < cols - 1; ++j)
-    {
 
-      float gradientXValue = gradientX[i][j];
-      float gradientYValue = gradientY[i][j];
-
-      float magnitude = std::sqrt(std::pow(gradientXValue, 2) + std::pow(gradientYValue, 2)); // find the gradient magnitude
-
-      if (magnitude > maxMagnitude)
-        maxMagnitude = magnitude; // get the max for normalization
-
-      magnitudes[i][j] = magnitude;
-      // dstImage.at<uchar>(i, j) = static_cast<uchar>(std::min(255.0f, std::max(0.0f, magnitude)));
-    }
-  }
+  applyNonMaxSuppression(magnitudes, gradientX, gradientY, maxMagnitude, rows, cols);
 
   // normalize the gradient magnitude
   for (int i = 0; i < rows; ++i)
@@ -197,6 +182,9 @@ void CannyEdgeDetector::findGradient(cv::Mat &dstImage)
   displayImage(dstImage);
 }
 
+/**
+ * calculate convolution NOTE: can be optimized
+ */
 std::vector<std::vector<float>> CannyEdgeDetector::convolution(const cv::Mat &image, const float sobelOperator[][3], int rows, int cols)
 {
 
@@ -227,18 +215,67 @@ std::vector<std::vector<float>> CannyEdgeDetector::convolution(const cv::Mat &im
   return result;
 }
 
-void printKernel(const std::vector<std::vector<double>> &kernel)
+/**
+ * apply Non-Maximum Suppression
+ */
+void CannyEdgeDetector::applyNonMaxSuppression(std::vector<std::vector<float>> &magnitudes,
+                                               std::vector<std::vector<float>> &gradientX, std::vector<std::vector<float>> &gradientY,
+                                               float &maxMagnitude, int rows, int cols)
 {
-  double sum = 0;
-  for (int i = 0; i < kernel.size(); ++i)
-  {
-    for (int j = 0; j < kernel.size(); ++j)
-    {
-      std::cout << kernel[i][j] << " ";
-      sum += kernel[i][j];
-    }
-    std::cout << "\n";
-  }
+  const float angleThreshold = 2.0; // account for numerical imprecisions that may occur while rounding gradientAngle
 
-  std::cout << "\nsum: " << sum;
+  for (int i = 1; i < rows - 1; ++i)
+  {
+    for (int j = 1; j < cols - 1; ++j)
+    {
+
+      float gradientXValue = gradientX[i][j];
+      float gradientYValue = gradientY[i][j];
+
+      float magnitude = std::sqrt(std::pow(gradientXValue, 2) + std::pow(gradientYValue, 2)); // find the gradient magnitude
+
+      // find the gradient direction in degrees
+      float gradientAngle = std::atan2(gradientYValue, gradientXValue) * 180 / M_PI;
+      gradientAngle = std::round(gradientAngle); // round the result angle
+
+      // get the neighboring pixels magnitudes
+      float northWestDirection = magnitudes[i - 1][j - 1]; // north- west direction
+      float northDirection = magnitudes[i - 1][j];         // north direction
+      float northEastDirection = magnitudes[i - 1][j + 1]; // north-east direction
+      float westDirection = magnitudes[i][j - 1];          // west in direction
+      float eastDirection = magnitudes[i][j + 1];          // east in direction
+      float southWestDirection = magnitudes[i + 1][j - 1]; // south-west direction
+      float southDirection = magnitudes[i + 1][j];         // south direction
+      float southEastDirection = magnitudes[i + 1][j + 1]; // south-east direction
+
+      if ((gradientAngle == 0 || gradientAngle == 180) && (magnitude > westDirection && magnitude > eastDirection))
+      {
+
+        magnitudes[i][j] = magnitude;
+      }
+      else if ((std::abs((gradientAngle - 90) < angleThreshold)) && (magnitude > northDirection && magnitude > southDirection))
+      {
+
+        magnitudes[i][j] = magnitude;
+      }
+      else if ((std::abs(gradientAngle - 135) < angleThreshold) && (magnitude > northWestDirection && magnitude > southEastDirection))
+      {
+
+        magnitudes[i][j] = magnitude;
+      }
+      else if ((std::abs(gradientAngle - 45) < angleThreshold) && (magnitude > northEastDirection && magnitude > southWestDirection))
+      {
+
+        magnitudes[i][j] = magnitude;
+      }
+      else
+      {
+
+        magnitudes[i][j] = 0;
+      }
+
+      if (magnitude > maxMagnitude)
+        maxMagnitude = magnitude; // get the max for normalization
+    }
+  }
 }

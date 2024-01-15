@@ -14,7 +14,10 @@ public:
     void applyGaussianBlur();
     void findGradient(cv::Mat &dstImage);
     void displayImage(const cv::Mat &dstImage);
-    void applyNonMaxSuppression();
+    void applyNonMaxSuppression(std::vector<std::vector<float>> &magnitudes,
+                                std::vector<std::vector<float>> &gradientX,
+                                std::vector<std::vector<float>> &gradientY,
+                                float &maxMagnitude, int rows, int cols);
     std::vector<std::vector<float>> convolution(const cv::Mat &image, const float sobelOperator[][3], int rows, int cols);
 
     std::vector<std::vector<double>> createGaussianFilter(int size, double sigma);
