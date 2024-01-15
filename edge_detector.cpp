@@ -3,11 +3,12 @@
 
 CannyEdgeDetector::CannyEdgeDetector(const std::string &imagePath,
                                      int lowThreshold, int upperThreshold)
-    : lowThreshold(lowThreshold), upperThreshold(upperThreshold),
+    : lowThreshold(lowThreshold), upperThreshold(upperThreshold), imagePath(imagePath),
       srcImage(loadImage(imagePath))
 {
 
   // srcImage = loadImage(imagePath);
+  applyGaussianBlur();
 }
 
 cv::Mat CannyEdgeDetector::loadImage(const std::string &imagePath)
@@ -73,13 +74,10 @@ CannyEdgeDetector::createGaussianFilter(int size, double sigma)
     }
   }
 
-  // if(std::abs(sum -1.0) > 1e-6){
-  //     std::cout<<"Error occurred\n";
-  // }
   return kernel;
 }
 
-void display(const cv::Mat &image)
+void CannyEdgeDetector::displayImage(const cv::Mat &image)
 {
 
   cv::imshow("Display window", image);
@@ -95,8 +93,7 @@ void display(const cv::Mat &image)
 void CannyEdgeDetector::applyGaussianBlur()
 {
 
-  std::cout << "applying blur\n";
-  std::vector<std::vector<double>> kernel = createGaussianFilter(7, 3.0);
+  std::vector<std::vector<double>> kernel = createGaussianFilter(3, 1.4);
 
   int x, y;
   x = y = 1;
@@ -126,48 +123,30 @@ void CannyEdgeDetector::applyGaussianBlur()
           {
 
             uchar temp = srcImage.at<uchar>(y, x);
-            // std::cout << "current src image pixel: " << temp << "\n";
-            convolvedPixel += temp * kernel[k][l];
 
-            // std::cout << "convolved pixel: " << convolvedPixel << "\n";
+            convolvedPixel += temp * kernel[k][l];
           }
           else
           {
-            // the kernel is out bounds and hanging of the image
+
             convolvedPixel += 0 * kernel[k][l];
           }
         }
-        // add dis image here
-        // std::cout << "final convolved pixel: " << convolvedPixel << "\n";
 
         if (convolvedPixel < 0)
           convolvedPixel = 0;
-        // std::cout << "Intermediate convolved pixel at (" << i << ", " << j <<
-        // "): " << convolvedPixel << "\n";
 
-        uchar test =
-            static_cast<uchar>(std::min(std::max(convolvedPixel, 0.0), 255.0));
-
-        dstImage.at<uchar>(i, j) = test;
+        dstImage.at<uchar>(i, j) = static_cast<uchar>(std::min(std::max(convolvedPixel, 0.0), 255.0));
       }
     }
   }
 
   findGradient(dstImage);
-  // cv::imwrite("personBlurred.jpg", dstImage);
-  // if (input == 's')
-  // {
-  // }
-
-  // display(dstImage);
 }
 
 void CannyEdgeDetector::findGradient(cv::Mat &dstImage)
 {
 
-  // cv::Mat dstImage = cv::imread("../images/cat.jpg", cv::IMREAD_GRAYSCALE);
-
-  std::cout << "getting gradient\n";
   float sobel_X[3][3] = {{1, 0, -1},
                          {2, 0, -2},
                          {1, 0, -1}};
@@ -180,101 +159,73 @@ void CannyEdgeDetector::findGradient(cv::Mat &dstImage)
   int rows = dstImage.rows;
   int cols = dstImage.cols;
 
-  std::vector<std::vector<float>> gradientX(rows, std::vector<float>(cols, 0));
-  std::vector<std::vector<float>> gradientY(rows, std::vector<float>(cols, 0));
+  std::vector<std::vector<float>> gradientX = convolution(dstImage, sobel_X, rows, cols);
+  std::vector<std::vector<float>> gradientY = convolution(dstImage, sobel_Y, rows, cols);
   std::vector<std::vector<float>> magnitudes(rows, std::vector<float>(cols, 0));
 
-  // get the image intensity in the x direction
-  for (int i = 1; i < rows - 1; ++i)
-  {
-    for (int j = 1; j < cols - 1; ++j)
-    {
-      // convolution here
-      float sumX = 0;
-      for (int k = -1; k <= 1; ++k)
-      { // go through the rows of sobel x
-
-        for (int l = -1; l <= 1; ++l)
-        {
-
-          sumX += dstImage.at<uchar>(i + k, j + l) * sobel_X[k + 1][l + 1];
-        }
-      }
-
-      gradientX[i][j] = sumX;
-    }
-  }
-  // get the y direction
-
-  std::cout << "getting y directions gradient\n";
-  for (int i = 1; i < rows - 1; ++i)
-  {
-    for (int j = 1; j < cols - 1; ++j)
-    {
-      // convolution here
-      float sumY = 0;
-      for (int k = -1; k <= 1; ++k)
-      { // go through the rows of sobel x
-
-        for (int l = -1; l <= 1; ++l)
-        {
-
-          sumY += dstImage.at<uchar>(i + k, j + l) * sobel_Y[k + 1][l + 1];
-        }
-      }
-
-      gradientY[i][j] = sumY;
-    }
-  }
-
-  std::cout << "Y DONE\n";
-
   float maxMagnitude = 0.0;
-  for (int i = 0; i < rows; ++i)
+  for (int i = 1; i < rows - 1; ++i)
   {
-
-    for (int j = 0; j < cols; ++j)
+    for (int j = 1; j < cols - 1; ++j)
     {
 
       float gradientXValue = gradientX[i][j];
       float gradientYValue = gradientY[i][j];
 
-      float magnitude = std::sqrt(std::pow(gradientXValue, 2) + std::pow(gradientYValue, 2));
+      float magnitude = std::sqrt(std::pow(gradientXValue, 2) + std::pow(gradientYValue, 2)); // find the gradient magnitude
 
       if (magnitude > maxMagnitude)
-        maxMagnitude = magnitude;
+        maxMagnitude = magnitude; // get the max for normalization
 
       magnitudes[i][j] = magnitude;
       // dstImage.at<uchar>(i, j) = static_cast<uchar>(std::min(255.0f, std::max(0.0f, magnitude)));
     }
   }
 
+  // normalize the gradient magnitude
   for (int i = 0; i < rows; ++i)
   {
 
     for (int j = 0; j < cols; ++j)
     {
-
       float normalizedMag = magnitudes[i][j] / maxMagnitude * 255.0f;
 
       dstImage.at<uchar>(i, j) = static_cast<uchar>(normalizedMag);
     }
   }
-  cv::imwrite("personBlurred1.jpg", dstImage);
+
+  displayImage(dstImage);
 }
 
-// void CannyEdgeDetector::displayImage()
-// {
+std::vector<std::vector<float>> CannyEdgeDetector::convolution(const cv::Mat &image, const float sobelOperator[][3], int rows, int cols)
+{
 
-//     cv::imshow("Display window", dstImage);
+  std::vector<std::vector<float>> result(rows, std::vector<float>(cols, 0));
 
-//     int input = cv::waitKey(0); // wait for input
+  // start 1 and subtract 1  to avoid going out of bounds
+  for (int i = 1; i < rows - 1; ++i)
+  {
 
-//     if (input == 's')
-//     {
-//         std::cout << "writing image\n";
-//     }
-// }
+    for (int j = 1; j < cols - 1; ++j)
+    {
+      float sum = 0;
+
+      for (int k = -1; k <= 1; ++k)
+      {
+
+        for (int l = -1; l <= 1; ++l)
+        {
+
+          sum += image.at<uchar>(i + k, j + l) * sobelOperator[k + 1][l + 1];
+        }
+      }
+
+      result[i][j] = sum;
+    }
+  }
+
+  return result;
+}
 
 void printKernel(const std::vector<std::vector<double>> &kernel)
 {
