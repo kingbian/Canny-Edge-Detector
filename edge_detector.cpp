@@ -173,9 +173,20 @@ void CannyEdgeDetector::findGradient(cv::Mat &dstImage)
 
     for (int j = 0; j < cols; ++j)
     {
-      float normalizedMag = magnitudes[i][j] / maxMagnitude * 255.0f;
+      magnitudes[i][j] /= maxMagnitude;
+      magnitudes[i][j] *= 255.0f; // scale to be in 0-255
+      // dstImage.at<uchar>(i, j) = static_cast<uchar>(normalizedMag);
+    }
+  }
 
-      dstImage.at<uchar>(i, j) = static_cast<uchar>(normalizedMag);
+  applyHysteresis(magnitudes, rows, cols);
+
+  for (int i = 0; i < rows; ++i)
+  {
+
+    for (int j = 0; j < cols; ++j)
+    {
+      dstImage.at<uchar>(i, j) = static_cast<uchar>(magnitudes[i][j]);
     }
   }
 
@@ -242,8 +253,8 @@ void CannyEdgeDetector::applyNonMaxSuppression(std::vector<std::vector<float>> &
       float northWestDirection = magnitudes[i - 1][j - 1]; // north- west direction
       float northDirection = magnitudes[i - 1][j];         // north direction
       float northEastDirection = magnitudes[i - 1][j + 1]; // north-east direction
-      float westDirection = magnitudes[i][j - 1];          // west in direction
-      float eastDirection = magnitudes[i][j + 1];          // east in direction
+      float westDirection = magnitudes[i][j - 1];          // west  direction
+      float eastDirection = magnitudes[i][j + 1];          // east  direction
       float southWestDirection = magnitudes[i + 1][j - 1]; // south-west direction
       float southDirection = magnitudes[i + 1][j];         // south direction
       float southEastDirection = magnitudes[i + 1][j + 1]; // south-east direction
@@ -276,6 +287,59 @@ void CannyEdgeDetector::applyNonMaxSuppression(std::vector<std::vector<float>> &
 
       if (magnitude > maxMagnitude)
         maxMagnitude = magnitude; // get the max for normalization
+    }
+  }
+}
+
+/**
+ * apply double threshold and hysteresis
+ */
+
+void CannyEdgeDetector::applyHysteresis(std::vector<std::vector<float>> &magnitudes, int rows, int cols)
+{
+
+  std::vector<std::vector<bool>> visited(rows, std::vector<bool>(cols, 0));
+  for (int i = 0; i < rows; ++i)
+  {
+
+    for (int j = 0; j < cols; ++j)
+    {
+
+      if (magnitudes[i][j] >= upperThreshold && !visited[i][j])
+      { // strong edge
+
+        trackEdge(magnitudes, visited, i, j, lowThreshold);
+      }
+    }
+  }
+}
+
+void CannyEdgeDetector::trackEdge(std::vector<std::vector<float>> &magnitudes,
+                                  std::vector<std::vector<bool>> &visited,
+                                  int row, int col, int lowerThreshold)
+{
+
+  visited[row][col] = true; // mark current pixel as visited
+
+  for (int i = -1; i <= 1; ++i)
+  {
+
+    for (int j = -1; j <= 1; ++j)
+    {
+
+      int newRow = row + i, newCol = col + j;
+
+      // check bounds
+
+      if (newRow >= 0 && newRow < magnitudes.size() && newCol >= 0 && newCol < magnitudes[0].size())
+      {
+
+        if (magnitudes[newRow][newCol] >= lowerThreshold && !visited[newRow][newCol])
+        {
+
+          trackEdge(magnitudes, visited, newRow, newCol, lowerThreshold);
+        }
+      }
     }
   }
 }

@@ -22,8 +22,14 @@ public:
 
     std::vector<std::vector<double>> createGaussianFilter(int size, double sigma);
 
+    void applyHysteresis(std::vector<std::vector<float>> &magnitudes, int rows, int cols);
+    void trackEdge(std::vector<std::vector<float>> &magnitudes,
+                   std::vector<std::vector<bool>> &visited,
+                   int rows, int cols, int lowerThreshold);
+
 private:
-    cv::Mat srcImage, dstImage;
+    cv::Mat srcImage,
+        dstImage;
     std::string imagePath;
     int lowThreshold, upperThreshold;
 };
