@@ -3,12 +3,14 @@
 #include <opencv2/opencv.hpp>
 #include <vector>
 #include <cstdlib>
+#include <queue>
+
 // #define PI 3.14159265358979323846
 class CannyEdgeDetector
 {
 
 public:
-    CannyEdgeDetector(const std::string &imagePath, int lowThreshold, int upperThreshold);
+    CannyEdgeDetector(const std::string &imagePath, double lowThreshold, double upperThreshold);
 
     cv::Mat loadImage(const std::string &imagePath);
     void applyGaussianBlur();
@@ -23,13 +25,11 @@ public:
     std::vector<std::vector<double>> createGaussianFilter(int size, double sigma);
 
     void applyHysteresis(std::vector<std::vector<float>> &magnitudes, int rows, int cols);
-    void trackEdge(std::vector<std::vector<float>> &magnitudes,
-                   std::vector<std::vector<bool>> &visited,
-                   int rows, int cols, int lowerThreshold);
+    void trackEdge(std::vector<std::vector<float>> &magnitudes, int i, int j, int rows, int cols);
 
 private:
     cv::Mat srcImage,
         dstImage;
     std::string imagePath;
-    int lowThreshold, upperThreshold;
+    double lowThreshold, upperThreshold;
 };

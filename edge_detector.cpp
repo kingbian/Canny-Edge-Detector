@@ -2,7 +2,7 @@
 #include <math.h>
 
 CannyEdgeDetector::CannyEdgeDetector(const std::string &imagePath,
-                                     int lowThreshold, int upperThreshold)
+                                     double lowThreshold, double upperThreshold)
     : lowThreshold(lowThreshold), upperThreshold(upperThreshold), imagePath(imagePath),
       srcImage(loadImage(imagePath))
 {
@@ -26,6 +26,7 @@ cv::Mat CannyEdgeDetector::loadImage(const std::string &imagePath)
     exit(EXIT_FAILURE);
   }
 
+  std::cout << "image read";
   return image;
 }
 
@@ -83,7 +84,7 @@ void CannyEdgeDetector::displayImage(const cv::Mat &image)
   cv::imshow("Display window", image);
 
   // int input = cv::waitKey(0); // wait for input
-  cv::imwrite("../images/test.jpg", image);
+  cv::imwrite("../images/test3.jpg", image);
   // if (input == 's')
   // {
   //   std::cout << "writing image\n";
@@ -93,7 +94,8 @@ void CannyEdgeDetector::displayImage(const cv::Mat &image)
 void CannyEdgeDetector::applyGaussianBlur()
 {
 
-  std::vector<std::vector<double>> kernel = createGaussianFilter(3, 1.4);
+  std::cout << "applyin blur\n";
+  std::vector<std::vector<double>> kernel = createGaussianFilter(5, 1.4);
 
   int x, y;
   x = y = 1;
@@ -140,6 +142,7 @@ void CannyEdgeDetector::applyGaussianBlur()
       }
     }
   }
+  std::cout << "blur done\n";
 
   findGradient(dstImage);
 }
@@ -147,9 +150,10 @@ void CannyEdgeDetector::applyGaussianBlur()
 void CannyEdgeDetector::findGradient(cv::Mat &dstImage)
 {
 
-  float sobel_X[3][3] = {{1, 0, -1},
-                         {2, 0, -2},
-                         {1, 0, -1}};
+  std::cout << "finding gradient \n";
+  float sobel_X[3][3] = {{-1, 0, 1},
+                         {-2, 0, 2},
+                         {-1, 0, 1}};
 
   float sobel_Y[3][3] = {{1, 2, 1},
                          {0, 0, 0},
@@ -165,8 +169,28 @@ void CannyEdgeDetector::findGradient(cv::Mat &dstImage)
 
   float maxMagnitude = 0.0;
 
+  std::cout << "starting non-max sup\n";
   applyNonMaxSuppression(magnitudes, gradientX, gradientY, maxMagnitude, rows, cols);
 
+  // for (int i = 1; i < rows - 1; ++i)
+  // {
+  //   for (int j = 1; j < cols - 1; ++j)
+  //   {
+
+  //     float gradientXValue = gradientX[i][j];
+  //     float gradientYValue = gradientY[i][j];
+
+  //     float magnitude = std::sqrt(std::pow(gradientXValue, 2) + std::pow(gradientYValue, 2)); // find the gradient magnitude
+
+  //     if (magnitude > maxMagnitude)
+  //       maxMagnitude = magnitude; // get the max for normalization
+
+  //     magnitudes[i][j] = magnitude;
+  //     // dstImage.at<uchar>(i, j) = static_cast<uchar>(std::min(255.0f, std::max(0.0f, magnitude)));
+  //   }
+  // }
+
+  std::cout << "Done non-max sup\n";
   // normalize the gradient magnitude
   for (int i = 0; i < rows; ++i)
   {
@@ -179,8 +203,11 @@ void CannyEdgeDetector::findGradient(cv::Mat &dstImage)
     }
   }
 
+  std::cout << "starting hystersis\n";
+
   applyHysteresis(magnitudes, rows, cols);
 
+  std::cout << "done hystersis\n";
   for (int i = 0; i < rows; ++i)
   {
 
@@ -190,6 +217,7 @@ void CannyEdgeDetector::findGradient(cv::Mat &dstImage)
     }
   }
 
+  std::cout << "done normalizing\n displaying image";
   displayImage(dstImage);
 }
 
@@ -228,12 +256,13 @@ std::vector<std::vector<float>> CannyEdgeDetector::convolution(const cv::Mat &im
 
 /**
  * apply Non-Maximum Suppression
+ * this is done to remove noise
  */
 void CannyEdgeDetector::applyNonMaxSuppression(std::vector<std::vector<float>> &magnitudes,
                                                std::vector<std::vector<float>> &gradientX, std::vector<std::vector<float>> &gradientY,
                                                float &maxMagnitude, int rows, int cols)
 {
-  const float angleThreshold = 2.0; // account for numerical imprecisions that may occur while rounding gradientAngle
+  const float angleThreshold = 3.0; // account for numerical imprecisions that may occur while rounding gradientAngle
 
   for (int i = 1; i < rows - 1; ++i)
   {
@@ -282,11 +311,13 @@ void CannyEdgeDetector::applyNonMaxSuppression(std::vector<std::vector<float>> &
       else
       {
 
-        magnitudes[i][j] = 0;
+        magnitudes[i][j] = 0.0;
       }
 
       if (magnitude > maxMagnitude)
         maxMagnitude = magnitude; // get the max for normalization
+
+      // std::cout << "Magnitude: " << magnitude << " Angle: " << gradientAngle << std::endl;
     }
   }
 }
@@ -298,46 +329,86 @@ void CannyEdgeDetector::applyNonMaxSuppression(std::vector<std::vector<float>> &
 void CannyEdgeDetector::applyHysteresis(std::vector<std::vector<float>> &magnitudes, int rows, int cols)
 {
 
-  std::vector<std::vector<bool>> visited(rows, std::vector<bool>(cols, 0));
+  std::cout << "upper is: " << upperThreshold << " lower is: " << lowThreshold << "\n";
   for (int i = 0; i < rows; ++i)
   {
 
     for (int j = 0; j < cols; ++j)
     {
 
-      if (magnitudes[i][j] >= upperThreshold && !visited[i][j])
+      if (magnitudes[i][j] >= upperThreshold)
+
       { // strong edge
 
-        trackEdge(magnitudes, visited, i, j, lowThreshold);
+        magnitudes[i][j] = 255;
+
+        trackEdge(magnitudes, i, j, rows, cols);
+      }
+      else if (magnitudes[i][j] < upperThreshold && magnitudes[i][j] >= lowThreshold)
+      {
+        magnitudes[i][j] = 100;
+      }
+      else
+      {
+        magnitudes[i][j] = 0;
       }
     }
   }
 }
 
-void CannyEdgeDetector::trackEdge(std::vector<std::vector<float>> &magnitudes,
-                                  std::vector<std::vector<bool>> &visited,
-                                  int row, int col, int lowerThreshold)
+void CannyEdgeDetector::trackEdge(std::vector<std::vector<float>> &magnitudes, int startPosI, int startPosY,
+                                  int rows, int cols)
 {
+  // std::vector<std::vector<bool>> visited;
 
-  visited[row][col] = true; // mark current pixel as visited
+  std::queue<std::pair<int, int>> queue; // store pixel positions
 
-  for (int i = -1; i <= 1; ++i)
-  {
+  queue.push({startPosI, startPosY}); // this is the starting point
 
-    for (int j = -1; j <= 1; ++j)
+  while (!queue.empty())
+  { // continue until the queue is empty
+
+    // get the current pixel's position
+    std::pair<int, int> currentPixelPos = queue.front();
+    queue.pop(); // remove the position we just got
+
+    int pixelPosAti = currentPixelPos.first;  // get the row
+    int pixelPosAtj = currentPixelPos.second; // get the col
+
+    /**
+     * check bounds and also check if
+     * the current pixel is a weak edge
+     * if so skip it
+     */
+    if (pixelPosAti < 0 || pixelPosAti >= rows || pixelPosAtj < 0 || pixelPosAtj >= cols || magnitudes[pixelPosAti][pixelPosAtj] != 100)
+    {
+      continue;
+    }
+
+    magnitudes[pixelPosAti][pixelPosAtj] = 255; // update the pixel to be a strong edge
+
+    // check for neighboring pixels that
+
+    for (int i = -1; i <= 1; ++i)
     {
 
-      int newRow = row + i, newCol = col + j;
-
-      // check bounds
-
-      if (newRow >= 0 && newRow < magnitudes.size() && newCol >= 0 && newCol < magnitudes[0].size())
+      for (int j = -1; j <= 1; ++j)
       {
 
-        if (magnitudes[newRow][newCol] >= lowerThreshold && !visited[newRow][newCol])
+        if (i == 0 && j == 0)
+          continue; // skip the current pixel be processed
+
+        int newPosI = pixelPosAti + i;
+        int newPosY = pixelPosAtj + j;
+
+        /**
+         * check if the new pixel (neighboring ) is a weak edge
+         * if it is added to queue to link to a strong edge
+         */
+        if (newPosI >= 0 && newPosI < rows && newPosY >= 0 && newPosY < cols && magnitudes[newPosI][newPosY] == 100)
         {
 
-          trackEdge(magnitudes, visited, newRow, newCol, lowerThreshold);
+          queue.push({newPosI, newPosY});
         }
       }
     }
