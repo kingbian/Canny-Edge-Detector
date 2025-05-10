@@ -14,10 +14,14 @@ include_directories(${OpenCV_INCLUDE_DIRS})
 link_directories(${OpenCV_LIBRARY_DIRS})
 add_definitions(${OpenCV_CFLAGS_OTHER})
 
+# Add debug flag
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g")
 
-set(SOURCES edge_detector.cpp main.cpp)
+set(CMAKE_BUILD_TYPE Debug)
 
-set(HEADERS edge_detector.h)
+set(SOURCES ./src/edge_detector.cpp ./src/main.cpp)
+
+set(HEADERS ./src/edge_detector.h)
 
 add_executable(${PROJECT_NAME} ${HEADERS} ${SOURCES} )
 
